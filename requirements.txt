@@ -34,3 +34,6 @@ ruff>=0.8
 # Notebooks
 ipykernel>=6.29
 jupyterlab>=4.3
+
+# LLM model (optional live path; offline heuristic fallback needs nothing)
+anthropic>=0.40

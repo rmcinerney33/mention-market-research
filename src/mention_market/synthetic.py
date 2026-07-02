@@ -73,10 +73,10 @@ class SyntheticParams:
     lead_times_hours: tuple[int, ...] = (24, 6, 1)
     market_efficiency: float = 1.0   # 1.0 => efficient market (expected headline)
     market_noise0: float = 0.05
-    usage_halflife_days: float = 30.0
-    a0: float = -0.4                 # base logit
-    a_usage: float = 2.5
-    a_topical: float = 1.8
+    usage_rho: float = 0.80          # EWMA memory weight for recency of usage
+    a0: float = -0.3                 # base logit (=> base rate ~0.43)
+    a_usage: float = 1.6             # effect of recency EWMA (bounded, no runaway)
+    a_topical: float = 1.2           # effect of topical salience
     seed: int = 42
 
 
@@ -161,25 +161,21 @@ def generate(params: SyntheticParams | None = None) -> SyntheticWorld:
             # Latent per-pair base rate for the market's inefficient fallback.
             base_rate = float(_sigmoid(p.a0 + rng.normal(0, 0.3)))
 
-            # Walk events forward in time, tracking recency-weighted usage.
+            # Walk events forward in time. Recency of usage is tracked as a
+            # bounded EWMA of prior labels (in [0, 1]) so the process has
+            # autocorrelation without the runaway saturation an unbounded
+            # accumulator produces. ``usage_rho`` is the memory weight.
             t = p.start + timedelta(days=float(rng.uniform(0, 5)))
-            usage_decay = 0.0
-            last_decay_time = t
-            decay_lambda = np.log(2) / p.usage_halflife_days  # per day
+            usage_ewma = float(_sigmoid(p.a0))  # neutral cold-start
             for e in range(p.events_per_pair):
                 gap_days = float(rng.exponential(p.mean_days_between_events)) + 0.25
                 t = t + timedelta(days=gap_days)
                 venue = _VENUES[int(rng.integers(0, len(_VENUES)))]
 
-                # Decay accumulated usage to now.
-                dt_days = (t - last_decay_time).total_seconds() / 86400.0
-                usage_decay *= float(np.exp(-decay_lambda * dt_days))
-                last_decay_time = t
-
                 topical = _topical_at(gdelt_phrase, t)
                 logit = (
                     p.a0
-                    + p.a_usage * (usage_decay - 0.5)
+                    + p.a_usage * (usage_ewma - 0.5)
                     + p.a_topical * (topical - 0.5)
                     + _VENUE_EFFECT[venue]
                 )
@@ -197,7 +193,7 @@ def generate(params: SyntheticParams | None = None) -> SyntheticWorld:
                         "label": label,
                         # Diagnostics only — NOT features:
                         "p_true": p_true,
-                        "usage_decay_true": usage_decay,
+                        "usage_ewma_true": usage_ewma,
                         "topical_true": topical,
                     }
                 )
@@ -232,9 +228,8 @@ def generate(params: SyntheticParams | None = None) -> SyntheticWorld:
                         }
                     )
 
-                # Update recency-weighted usage if the phrase was actually used.
-                if label == 1:
-                    usage_decay += 1.0
+                # Update the bounded recency EWMA with the realized label.
+                usage_ewma = p.usage_rho * usage_ewma + (1 - p.usage_rho) * label
 
         phrases[sp.speaker_id] = sp_phrases
 
