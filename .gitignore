@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Environments
+.venv/
+venv/
+env/
+.env
+.env.local
+
+# Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data — track structure only, not contents
+data/raw/*
+data/processed/*
+data/external/*
+!data/**/.gitkeep
+
+# Outputs — track structure only
+outputs/figures/*
+outputs/models/*
+outputs/reports/*
+!outputs/**/.gitkeep
+
+# Secrets / local overrides
+config.local.yaml
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp

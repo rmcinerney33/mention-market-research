@@ -1,0 +1,81 @@
+# mention-market-research config
+#
+# Secrets go in environment variables, not in this file. This file is checked in.
+# Local overrides can live in config.local.yaml (gitignored) and are merged on top.
+
+project:
+  timezone: "America/New_York"
+  random_seed: 42
+
+# ---------- Data sources ----------
+sources:
+  kalshi:
+    base_url: "https://api.elections.kalshi.com/trade-api/v2"
+    # Auth via env vars: KALSHI_KEY_ID, KALSHI_PRIVATE_KEY_PATH
+    # Historical order-book depth is limited — see README.
+
+  polymarket:
+    gamma_url: "https://gamma-api.polymarket.com"
+    clob_url: "https://clob.polymarket.com"
+    # Auth (only needed for writes / private endpoints): POLYMARKET_API_KEY
+
+  gdelt:
+    # Public, no auth
+    doc_api_url: "https://api.gdeltproject.org/api/v2/doc/doc"
+    gkg_bucket: "gdelt-open-data"  # BigQuery / GCS path for bulk pulls
+
+  transcripts:
+    # Concrete adapters implemented in Phase 2. Placeholders here.
+    cspan_base_url: "https://www.c-span.org"
+    rollcall_base_url: "https://rollcall.com"
+    # Rev.com: paid, adapter only wired if REV_API_KEY is set
+
+# ---------- Storage paths (relative to repo root) ----------
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  external_dir: "data/external"
+  outputs_dir: "outputs"
+
+# ---------- Targets ----------
+# Populated in Phase 2 as we confirm which speaker/phrase pairs have both
+# transcript coverage AND traded mention markets. Empty by default so tests
+# fail loudly if code assumes targets are configured.
+targets:
+  speakers: []
+  # Example structure (uncomment and edit when we have real targets):
+  #
+  # speakers:
+  #   - id: "trump"
+  #     display_name: "Donald Trump"
+  #     aliases: ["Donald J. Trump", "President Trump", "Former President Trump"]
+  #     phrases:
+  #       - canonical: "witch hunt"
+  #         variants: ["witch-hunt"]      # exact + variants; matcher is case-insensitive
+  #       - canonical: "fake news"
+  #         variants: []
+
+# ---------- Time windows ----------
+# All dates are inclusive. Walk-forward CV in Phase 5 will subdivide these.
+date_ranges:
+  train_start: "2023-01-01"
+  train_end:   "2024-12-31"
+  test_start:  "2025-01-01"
+  test_end:    "2025-12-31"
+
+# ---------- Market-price snapshots ----------
+# Lead times (hours before event) at which we snapshot the market's implied
+# probability. Used for the Phase-6 Mincer-Zarnowitz regression.
+market_snapshots:
+  lead_times_hours: [24, 6, 1]
+
+# ---------- Feature engineering ----------
+features:
+  recency_halflives_days: [7, 30, 90]
+  rolling_windows_events: [5, 10, 20]
+
+# ---------- Modeling ----------
+modeling:
+  # Placeholder — model-specific hyperparams filled in Phase 4.
+  cv_scheme: "expanding_walk_forward"
+  bootstrap_iters: 1000
