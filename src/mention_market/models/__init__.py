@@ -33,6 +33,23 @@ def default_model_suite(include_bayesian: bool = True) -> list[MentionModel]:
     return models
 
 
+def default_model_factories(
+    include_bayesian: bool = True, bayesian_kwargs: dict | None = None
+) -> dict:
+    """Name -> zero-arg factory, for cross-validation (fresh model per fold)."""
+    bk = bayesian_kwargs or {}
+    facs: dict = {
+        "laplace_base_rate": LaplaceBaseRateModel,
+        "logistic": LogisticModel,
+        "cox_survival": CoxSurvivalModel,
+        "gbdt": GBDTModel,
+    }
+    if include_bayesian:
+        facs["bayesian_hierarchical"] = lambda: BayesianHierarchicalModel(**bk)
+    facs["llm_contextual"] = LLMContextualModel
+    return facs
+
+
 __all__ = [
     "MentionModel",
     "LaplaceBaseRateModel",
@@ -42,4 +59,5 @@ __all__ = [
     "BayesianHierarchicalModel",
     "LLMContextualModel",
     "default_model_suite",
+    "default_model_factories",
 ]

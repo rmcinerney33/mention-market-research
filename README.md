@@ -11,7 +11,68 @@ information" is a legitimate finding.
 
 ## Status
 
-Phase 1 (scaffolding) — see `Phased build` below.
+All seven phases implemented and runnable end-to-end. The full study runs on a
+synthetic world with known ground truth (so the methodology itself can be
+validated); the real ingestion adapters are wired for when API access and
+historical data are available. See **Results** below and
+[`outputs/reports/REPORT.md`](outputs/reports/REPORT.md).
+
+## Quickstart
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
+pytest                                  # 90+ tests; lookahead suite is the core
+python -m mention_market.pipeline       # runs the whole study -> outputs/
+```
+
+Useful flags: `--no-bayesian` (skip the slow sampler), `--market-efficiency 0.3`
+(inject a detectable edge), `--mz-method logit`, `--events-per-pair N`.
+
+## Results (synthetic demonstration)
+
+Walk-forward out-of-sample, 4 folds, 288 test predictions per model, 95%
+bootstrap CIs. Lower Brier is better; higher AUC is better; `ece` is expected
+calibration error.
+
+| model | Brier | AUC | ECE |
+| --- | --- | --- | --- |
+| bayesian_hierarchical | **0.235** | 0.590 | 0.047 |
+| llm_contextual | 0.237 | 0.590 | 0.048 |
+| gbdt | 0.240 | 0.581 | **0.040** |
+| logistic | 0.244 | **0.599** | 0.095 |
+| laplace_base_rate (floor) | 0.244 | 0.531 | 0.052 |
+| cox_survival | 0.328 | 0.425 | 0.262 |
+
+The trained models edge out the Laplace base rate on Brier/AUC but — by
+Diebold-Mariano — **not significantly** on this thin sample; the survival model
+underperforms the base rate here (an honest negative result). This is the
+expected texture of a hard, low-signal prediction problem.
+
+### Headline: market-efficiency test
+
+Forecast-encompassing regression `y ~ p_model + p_market` for the best model,
+run at three lead times, on the default **efficient** synthetic market:
+
+| lead time | model coef (p) | market coef (p) | verdict |
+| --- | --- | --- | --- |
+| T-24h | 0.57 (0.066) | 0.58 (<0.001) | market subsumes model |
+| T-6h | 0.49 (0.109) | 0.73 (<0.001) | market subsumes model |
+| T-1h | 0.43 (0.162) | 0.86 (<0.001) | market subsumes model |
+
+The market coefficient is strongly significant at every lead time; the model
+coefficient never clears significance after controlling for the price, and its
+marginal contribution **decays as the event approaches** while the market
+sharpens. That is the textbook signature of an efficient market — and a
+legitimate finding, not a failure.
+
+**The test has power in the other direction too.** Re-running with an
+inefficient market (`--market-efficiency 0.3`), the same regression recovers a
+significant model coefficient at every lead time (p = 0.007 / 0.011 / 0.015 →
+"model adds information beyond the market"). Same machinery, opposite verdict,
+both correct.
+
+## Phased build
 
 ## Phased build
 

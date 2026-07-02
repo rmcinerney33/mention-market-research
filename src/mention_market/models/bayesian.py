@@ -65,7 +65,10 @@ class BayesianHierarchicalModel(MentionModel):
             with pm.Model():
                 mu_alpha = pm.Normal("mu_alpha", 0.0, 1.5)
                 sigma_alpha = pm.HalfNormal("sigma_alpha", 1.0)
-                alpha = pm.Normal("alpha", mu_alpha, sigma_alpha, shape=len(self._phrase_categories))
+                # Non-centered parameterization: the standard fix for the
+                # funnel geometry that causes divergences in hierarchical models.
+                z_alpha = pm.Normal("z_alpha", 0.0, 1.0, shape=len(self._phrase_categories))
+                alpha = pm.Deterministic("alpha", mu_alpha + z_alpha * sigma_alpha)
                 beta = pm.Normal("beta", 0.0, 1.0, shape=Xs.shape[1])
                 logit = alpha[phrase_idx] + pm.math.dot(Xs, beta)
                 pm.Bernoulli("obs", logit_p=logit, observed=y.astype(int))

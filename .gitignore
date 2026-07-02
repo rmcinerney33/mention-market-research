@@ -29,10 +29,12 @@ data/processed/*
 data/external/*
 !data/**/.gitkeep
 
-# Outputs — track structure only
-outputs/figures/*
+# Outputs — the generated report (Markdown + CSVs) and figures ARE the
+# deliverable, so they are tracked. Only large model binaries and scratch
+# scenario dirs are ignored.
 outputs/models/*
-outputs/reports/*
+!outputs/models/.gitkeep
+outputs/scenario_*/
 !outputs/**/.gitkeep
 
 # Secrets / local overrides

@@ -21,14 +21,20 @@ from .preprocessing import make_tree_transformer
 class GBDTModel(MentionModel):
     name = "gbdt"
 
-    def __init__(self, max_iter: int = 300, learning_rate: float = 0.05,
-                 max_leaf_nodes: int = 31, random_state: int = 42) -> None:
+    def __init__(self, max_iter: int = 400, learning_rate: float = 0.05,
+                 max_leaf_nodes: int = 15, min_samples_leaf: int = 20,
+                 random_state: int = 42) -> None:
         self.transformer = make_tree_transformer()
+        # Early stopping guards against overfitting the thin walk-forward folds.
         self.clf = HistGradientBoostingClassifier(
             max_iter=max_iter,
             learning_rate=learning_rate,
             max_leaf_nodes=max_leaf_nodes,
+            min_samples_leaf=min_samples_leaf,
             l2_regularization=1.0,
+            early_stopping=True,
+            validation_fraction=0.15,
+            n_iter_no_change=20,
             random_state=random_state,
         )
         self._degenerate: float | None = None
