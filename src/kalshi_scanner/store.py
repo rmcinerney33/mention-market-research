@@ -59,6 +59,29 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_snap_ticker_ts ON market_snapshots(ticker, scan_ts);
 CREATE INDEX IF NOT EXISTS idx_snap_scan ON market_snapshots(scan_id);
+
+CREATE TABLE IF NOT EXISTS signals (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id             INTEGER,
+    ticker              TEXT NOT NULL,
+    scan_ts             TEXT,
+    category            TEXT,
+    validated           INTEGER,
+    event_time          TEXT,
+    market_yes_bid      INTEGER,
+    market_yes_ask      INTEGER,
+    market_implied_prob REAL,
+    model_prob          REAL,
+    ci_lo               REAL,
+    ci_hi               REAL,
+    model_version       TEXT,
+    model_hash          TEXT,
+    features_json       TEXT,
+    reason              TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_signal_scan ON signals(scan_id);
+CREATE INDEX IF NOT EXISTS idx_signal_ticker ON signals(ticker);
 """
 
 
@@ -153,6 +176,61 @@ class SnapshotStore:
         return list(
             self._conn.execute(
                 "SELECT * FROM market_snapshots WHERE scan_id=? ORDER BY ticker", (scan_id,)
+            ).fetchall()
+        )
+
+    def load_snapshots(self, scan_id: int) -> list[MarketSnapshot]:
+        """Rebuild :class:`MarketSnapshot` objects from a stored scan.
+
+        The full raw API market is round-tripped via ``raw_json``, so signals can
+        be (re)generated offline from a past scan without re-hitting Kalshi.
+        """
+        out: list[MarketSnapshot] = []
+        for r in self.snapshots_for_scan(scan_id):
+            raw = json.loads(r["raw_json"]) if r["raw_json"] else {"ticker": r["ticker"]}
+            out.append(
+                MarketSnapshot.from_api(
+                    raw, scan_ts=datetime.fromisoformat(r["scan_ts"]), category=r["category"]
+                )
+            )
+        return out
+
+    def latest_ok_scan_id(self) -> int | None:
+        row = self._conn.execute(
+            "SELECT scan_id FROM scan_runs WHERE status='ok' ORDER BY scan_id DESC LIMIT 1"
+        ).fetchone()
+        return int(row[0]) if row else None
+
+    # -- signals ---------------------------------------------------------
+    def record_signals(self, signals: list) -> None:
+        self._conn.executemany(
+            """INSERT INTO signals (
+                scan_id, ticker, scan_ts, category, validated, event_time,
+                market_yes_bid, market_yes_ask, market_implied_prob,
+                model_prob, ci_lo, ci_hi, model_version, model_hash, features_json, reason
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            [
+                (
+                    s.scan_id, s.ticker, _iso(s.scan_ts), s.category, int(s.validated),
+                    _iso(s.event_time), s.market_yes_bid, s.market_yes_ask, s.market_implied_prob,
+                    s.model_prob, s.ci_lo, s.ci_hi, s.model_version, s.model_hash,
+                    s.features_json, s.reason,
+                )
+                for s in signals
+            ],
+        )
+        self._conn.commit()
+
+    def count_signals(self, scored_only: bool = False) -> int:
+        sql = "SELECT COUNT(*) FROM signals"
+        if scored_only:
+            sql += " WHERE model_prob IS NOT NULL"
+        return int(self._conn.execute(sql).fetchone()[0])
+
+    def signals_for_scan(self, scan_id: int) -> list[sqlite3.Row]:
+        return list(
+            self._conn.execute(
+                "SELECT * FROM signals WHERE scan_id=? ORDER BY ticker", (scan_id,)
             ).fetchall()
         )
 

@@ -26,10 +26,14 @@ def _setup_logging(verbose: bool) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="kalshi_scanner", description=__doc__)
-    ap.add_argument("command", choices=["scan-once", "run", "status"])
+    ap.add_argument("command", choices=["scan-once", "run", "status", "generate-signals"])
     ap.add_argument("--config", default=None, help="path to kalshi_scanner.yaml")
     ap.add_argument("--max-iterations", type=int, default=None,
                     help="stop 'run' after N scans (default: forever)")
+    ap.add_argument("--scan-id", type=int, default=None,
+                    help="scan to score for generate-signals (default: latest ok scan)")
+    ap.add_argument("--signal-model", default="gbdt", help="research model to score with")
+    ap.add_argument("--n-bootstrap", type=int, default=40, help="bootstrap replicas for the CI")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     _setup_logging(args.verbose)
@@ -50,6 +54,30 @@ def main(argv: list[str] | None = None) -> int:
             print(f"coverage gaps:    {len(gaps)}")
             for g in gaps[:10]:
                 print(f"  - {g}")
+        return 0
+
+    if args.command == "generate-signals":
+        from .signal_generator import build_default_signal_generator
+        with SnapshotStore(config.db_path) as store:
+            scan_id = args.scan_id or store.latest_ok_scan_id()
+            if scan_id is None:
+                print("no successful scan found; run scan-once first")
+                return 1
+            snapshots = store.load_snapshots(scan_id)
+            print(f"scoring {len(snapshots)} snapshots from scan #{scan_id} "
+                  f"(model={args.signal_model}, {args.n_bootstrap} bootstrap replicas)...")
+            gen = build_default_signal_generator(
+                config, store=store, model_name=args.signal_model, n_bootstrap=args.n_bootstrap
+            )
+            signals = gen.generate(snapshots, scan_id=scan_id)
+            scored = [s for s in signals if s.is_scored]
+            print(f"{len(scored)} scored / {len(signals)} total "
+                  f"(validated categories: {config.validated_categories or '[]'})")
+            for s in scored[:15]:
+                tag = "VALIDATED" if s.validated else "unvalidated (not flaggable)"
+                mkt = f"{s.market_implied_prob:.2f}" if s.market_implied_prob is not None else "n/a"
+                print(f"  {s.ticker}: model={s.model_prob:.2f} "
+                      f"[{s.ci_lo:.2f},{s.ci_hi:.2f}] mkt={mkt} — {tag}")
         return 0
 
     scanner = build_scanner(config)

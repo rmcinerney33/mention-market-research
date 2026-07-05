@@ -67,3 +67,30 @@ def test_gaps_never_interpolate(tmp_path):
     r = store.start_run(t0, ["mention"])
     store.finish_run(r, t0, "failed", 0, error="down")
     assert store.count_snapshots() == 0
+
+
+def test_load_snapshots_round_trip(tmp_path):
+    store = SnapshotStore(tmp_path / "s.sqlite")
+    scan_ts = datetime(2024, 11, 5, 12, tzinfo=UTC)
+    scan_id = store.start_run(scan_ts, ["mention"])
+    snap = _snapshot(scan_ts)
+    store.record_snapshots(scan_id, [snap])
+    store.finish_run(scan_id, scan_ts, "ok", 1)
+
+    loaded = store.load_snapshots(scan_id)
+    assert len(loaded) == 1
+    assert loaded[0].ticker == snap.ticker
+    assert loaded[0].yes_ask == snap.yes_ask
+    assert loaded[0].category == "mention"
+    assert loaded[0].scan_ts == scan_ts
+
+
+def test_latest_ok_scan_id(tmp_path):
+    store = SnapshotStore(tmp_path / "s.sqlite")
+    t0 = datetime(2024, 11, 5, 12, tzinfo=UTC)
+    assert store.latest_ok_scan_id() is None
+    r1 = store.start_run(t0, ["mention"])
+    store.finish_run(r1, t0, "ok", 0)
+    r2 = store.start_run(t0, ["mention"])
+    store.finish_run(r2, t0, "failed", 0, error="down")
+    assert store.latest_ok_scan_id() == r1  # r2 failed, so r1 is the latest ok

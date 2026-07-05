@@ -180,10 +180,37 @@ Secrets are read from the environment, never the file: `KALSHI_API_KEY_ID`,
 Unauthenticated reads work for basic market fields; **order-book depth requires
 credentials** and is used in later phases.
 
+### Phase 2 (implemented): signal generator
+
+Scores scanned markets with a research model, storing the probability **and its
+uncertainty** (required downstream). For each market it: parses the title into a
+`(speaker, phrase, event_time)` unit, resolves the point-in-time feature row by
+appending a query event to that speaker/phrase's history and running the
+research repo's `build_feature_table(..., audit=True)` (so the no-lookahead
+guarantee is reused, not reinvented), then scores it. Uncertainty is a
+model-agnostic **bootstrap-ensemble CI**; each signal records the model
+version/hash, the exact features used, and the market's implied price.
+
+```bash
+python -m kalshi_scanner generate-signals   # score the latest scan's snapshots
+```
+
+Two honest caveats:
+
+- **Signals are computed for every scanned category, but only *validated*
+  categories are flaggable — and none are validated yet**, so every signal is
+  tagged `unvalidated (not flaggable)`. Computing signals on candidates is how
+  they earn validation via paper trading (Phase 6); flagging is gated in Phase 3.
+- **The training corpus is the synthetic research world** (all that exists
+  today). A real market's speaker/phrase usually isn't in it, so the model
+  returns a near-base-rate estimate with a **wide** CI — correctly reflecting
+  that it knows little. Swap in real ingested history and nothing else changes.
+
+The model layer is imported from `mention_market.models` — no duplicated model
+or feature code between the two projects.
+
 ### Roadmap (checked in before each phase)
 
-2. Signal generator — run validated models on scanned markets; store model
-   probability, version/hash, features used, and the model's own uncertainty.
 3. Edge calculator — real Kalshi fee formula, slippage haircut from book depth,
    fractional-Kelly sizing, and a gate that only flags when price is outside the
    model's confidence interval.
