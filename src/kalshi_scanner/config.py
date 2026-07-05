@@ -53,6 +53,24 @@ class RateLimitConfig:
 
 
 @dataclass(frozen=True)
+class TradingConfig:
+    """Sizing/gating parameters for the edge calculator (Phase 3).
+
+    None of this places orders — it only decides what a human would be shown as
+    flaggable. Real-money use is gated behind paper trading regardless.
+    """
+
+    bankroll: float = 10_000.0
+    kelly_fraction: float = 0.25          # quarter Kelly by default
+    max_position_frac: float = 0.02       # hard cap: 2% of bankroll per position
+    fee_coefficient: float = 0.07         # Kalshi general fee coef (re-confirm vs schedule)
+    ci_margin: float = 0.0                # extra margin beyond the model CI for the gate
+    min_ev_per_contract: float = 0.0      # minimum fee/slippage-adjusted EV to flag (dollars)
+    slippage_buffer_cents: float = 1.0    # conservative buffer when depth is unknown
+    require_book_for_flag: bool = True    # refuse to flag without real order-book depth
+
+
+@dataclass(frozen=True)
 class KalshiApiConfig:
     base_url: str = "https://api.elections.kalshi.com/trade-api/v2"
     timeout_s: float = 10.0
@@ -74,6 +92,7 @@ class ScannerConfig:
     db_path: Path
     api: KalshiApiConfig
     rate_limit: RateLimitConfig
+    trading: TradingConfig
     categories: list[CategoryRule]
 
     @property
@@ -148,6 +167,18 @@ def load_scanner_config(
         backoff_max_s=float(rl_cfg.get("backoff_max_s", 60.0)),
     )
 
+    tr_cfg = cfg.get("trading", {})
+    trading = TradingConfig(
+        bankroll=float(tr_cfg.get("bankroll", 10_000.0)),
+        kelly_fraction=float(tr_cfg.get("kelly_fraction", 0.25)),
+        max_position_frac=float(tr_cfg.get("max_position_frac", 0.02)),
+        fee_coefficient=float(tr_cfg.get("fee_coefficient", 0.07)),
+        ci_margin=float(tr_cfg.get("ci_margin", 0.0)),
+        min_ev_per_contract=float(tr_cfg.get("min_ev_per_contract", 0.0)),
+        slippage_buffer_cents=float(tr_cfg.get("slippage_buffer_cents", 1.0)),
+        require_book_for_flag=bool(tr_cfg.get("require_book_for_flag", True)),
+    )
+
     categories = [
         CategoryRule(
             name=c["name"],
@@ -171,6 +202,7 @@ def load_scanner_config(
         db_path=db_path,
         api=api,
         rate_limit=rate_limit,
+        trading=trading,
         categories=categories,
     )
 

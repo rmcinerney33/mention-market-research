@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS signals (
     event_time          TEXT,
     market_yes_bid      INTEGER,
     market_yes_ask      INTEGER,
+    market_no_bid       INTEGER,
+    market_no_ask       INTEGER,
     market_implied_prob REAL,
     model_prob          REAL,
     ci_lo               REAL,
@@ -82,6 +84,33 @@ CREATE TABLE IF NOT EXISTS signals (
 
 CREATE INDEX IF NOT EXISTS idx_signal_scan ON signals(scan_id);
 CREATE INDEX IF NOT EXISTS idx_signal_ticker ON signals(ticker);
+
+CREATE TABLE IF NOT EXISTS edges (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id          INTEGER,
+    ticker           TEXT NOT NULL,
+    category         TEXT,
+    validated        INTEGER,
+    side             TEXT,
+    model_prob       REAL,
+    ci_lo            REAL,
+    ci_hi            REAL,
+    market_price     REAL,
+    raw_edge         REAL,
+    fee_per_contract REAL,
+    effective_cost   REAL,
+    ev_per_contract  REAL,
+    kelly_fraction   REAL,
+    contracts        INTEGER,
+    notional         REAL,
+    slippage         REAL,
+    book_available   INTEGER,
+    gate_pass        INTEGER,
+    flaggable        INTEGER,
+    reason           TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_edge_scan ON edges(scan_id);
 """
 
 
@@ -206,13 +235,14 @@ class SnapshotStore:
         self._conn.executemany(
             """INSERT INTO signals (
                 scan_id, ticker, scan_ts, category, validated, event_time,
-                market_yes_bid, market_yes_ask, market_implied_prob,
+                market_yes_bid, market_yes_ask, market_no_bid, market_no_ask, market_implied_prob,
                 model_prob, ci_lo, ci_hi, model_version, model_hash, features_json, reason
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             [
                 (
                     s.scan_id, s.ticker, _iso(s.scan_ts), s.category, int(s.validated),
-                    _iso(s.event_time), s.market_yes_bid, s.market_yes_ask, s.market_implied_prob,
+                    _iso(s.event_time), s.market_yes_bid, s.market_yes_ask,
+                    s.market_no_bid, s.market_no_ask, s.market_implied_prob,
                     s.model_prob, s.ci_lo, s.ci_hi, s.model_version, s.model_hash,
                     s.features_json, s.reason,
                 )
@@ -231,6 +261,41 @@ class SnapshotStore:
         return list(
             self._conn.execute(
                 "SELECT * FROM signals WHERE scan_id=? ORDER BY ticker", (scan_id,)
+            ).fetchall()
+        )
+
+    # -- edges -----------------------------------------------------------
+    def record_edges(self, edges: list) -> None:
+        self._conn.executemany(
+            """INSERT INTO edges (
+                scan_id, ticker, category, validated, side, model_prob, ci_lo, ci_hi,
+                market_price, raw_edge, fee_per_contract, effective_cost, ev_per_contract,
+                kelly_fraction, contracts, notional, slippage, book_available,
+                gate_pass, flaggable, reason
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            [
+                (
+                    e.scan_id, e.ticker, e.category, int(e.validated), e.side, e.model_prob,
+                    e.ci_lo, e.ci_hi, e.market_price, e.raw_edge, e.fee_per_contract,
+                    e.effective_cost, e.ev_per_contract, e.kelly_fraction, e.contracts,
+                    e.notional, e.slippage, int(e.book_available), int(e.gate_pass),
+                    int(e.flaggable), e.reason,
+                )
+                for e in edges
+            ],
+        )
+        self._conn.commit()
+
+    def count_edges(self, flaggable_only: bool = False) -> int:
+        sql = "SELECT COUNT(*) FROM edges"
+        if flaggable_only:
+            sql += " WHERE flaggable=1"
+        return int(self._conn.execute(sql).fetchone()[0])
+
+    def edges_for_scan(self, scan_id: int) -> list[sqlite3.Row]:
+        return list(
+            self._conn.execute(
+                "SELECT * FROM edges WHERE scan_id=? ORDER BY flaggable DESC, ticker", (scan_id,)
             ).fetchall()
         )
 

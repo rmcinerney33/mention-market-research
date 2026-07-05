@@ -209,11 +209,37 @@ Two honest caveats:
 The model layer is imported from `mention_market.models` — no duplicated model
 or feature code between the two projects.
 
+### Phase 3 (implemented): edge calculator
+
+Turns each scored signal into a flag *decision*. For the chosen side it computes:
+
+- **Raw edge** against the *executable* price (the ask we'd pay, not the mid).
+- **Fee-adjusted EV** using Kalshi's real fee formula `roundup(0.07·C·P·(1−P))`
+  to the cent — never a flat percentage. The coefficient is configurable and
+  **must be re-confirmed against Kalshi's live schedule before real use** (the
+  docs fetch was rate-limited when this was written). Fees are the project's #1
+  test-correctness priority; `tests/test_fees.py` pins the worked examples.
+- **Slippage** by walking the order book to a VWAP fill (real book-walk when
+  authenticated; a conservative top-of-book-plus-buffer fallback otherwise).
+- **Fractional-Kelly size** — full Kelly on the fee/slippage-adjusted edge,
+  scaled by a configurable fraction (default ¼) and hard-capped at a % of
+  bankroll per position (default 2%).
+
+```bash
+python -m kalshi_scanner evaluate-edges     # score + evaluate the latest scan
+```
+
+**The statistical gate** is the crux: a market is only flaggable when the
+executable price is **outside** the model's confidence interval (a gap inside
+the uncertainty band is noise). Flagging additionally requires a validated
+category, positive fee-adjusted EV, and real order-book depth. With today's
+defaults nothing is flaggable — no category is validated *and* order-book depth
+needs credentials — which is the correct, conservative outcome. The full
+computation (side, EV, size) is still recorded for every market so candidates
+can be paper-traded (Phase 6).
+
 ### Roadmap (checked in before each phase)
 
-3. Edge calculator — real Kalshi fee formula, slippage haircut from book depth,
-   fractional-Kelly sizing, and a gate that only flags when price is outside the
-   model's confidence interval.
 4. Correlation & portfolio checks — group correlated markets (e.g. multiple
    phrases on one speech), size Kelly at the group level, enforce exposure caps.
 5. Alerting & dashboard — local dashboard + optional push; every flag logged

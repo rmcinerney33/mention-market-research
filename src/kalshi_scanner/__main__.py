@@ -26,7 +26,10 @@ def _setup_logging(verbose: bool) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="kalshi_scanner", description=__doc__)
-    ap.add_argument("command", choices=["scan-once", "run", "status", "generate-signals"])
+    ap.add_argument(
+        "command",
+        choices=["scan-once", "run", "status", "generate-signals", "evaluate-edges"],
+    )
     ap.add_argument("--config", default=None, help="path to kalshi_scanner.yaml")
     ap.add_argument("--max-iterations", type=int, default=None,
                     help="stop 'run' after N scans (default: forever)")
@@ -78,6 +81,34 @@ def main(argv: list[str] | None = None) -> int:
                 mkt = f"{s.market_implied_prob:.2f}" if s.market_implied_prob is not None else "n/a"
                 print(f"  {s.ticker}: model={s.model_prob:.2f} "
                       f"[{s.ci_lo:.2f},{s.ci_hi:.2f}] mkt={mkt} — {tag}")
+        return 0
+
+    if args.command == "evaluate-edges":
+        from .edge import EdgeEvaluator
+        from .signal_generator import build_default_signal_generator
+        with SnapshotStore(config.db_path) as store:
+            scan_id = args.scan_id or store.latest_ok_scan_id()
+            if scan_id is None:
+                print("no successful scan found; run scan-once first")
+                return 1
+            snapshots = store.load_snapshots(scan_id)
+            print(f"scoring + evaluating {len(snapshots)} markets from scan #{scan_id}...")
+            gen = build_default_signal_generator(
+                config, store=None, model_name=args.signal_model, n_bootstrap=args.n_bootstrap
+            )
+            signals = gen.generate(snapshots)
+            edges = EdgeEvaluator(config.trading).evaluate_all(signals, scan_id=scan_id, store=store)
+            flaggable = [e for e in edges if e.flaggable]
+            print(f"{len(flaggable)} flaggable / {len(edges)} evaluated "
+                  f"(validated categories: {config.validated_categories or '[]'})")
+            # Show the closest-to-flaggable candidates (gate passed) for insight.
+            gated = [e for e in edges if e.gate_pass]
+            for e in gated[:15]:
+                print(f"  {e.ticker} [{e.side}]: model={e.model_prob:.2f} "
+                      f"px={e.market_price:.2f} ev/contract={e.ev_per_contract:+.3f} "
+                      f"size={e.contracts} — {'FLAG' if e.flaggable else e.reason}")
+            if not gated:
+                print("  (no market's executable price is outside its model CI — all noise)")
         return 0
 
     scanner = build_scanner(config)

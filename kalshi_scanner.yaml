@@ -30,6 +30,18 @@ rate_limit:
   backoff_base_s: 1.0
   backoff_max_s: 60.0
 
+# Edge calculator (Phase 3). None of this places orders — it only decides what a
+# human would be shown as flaggable, and only in validated categories.
+trading:
+  bankroll: 10000.0
+  kelly_fraction: 0.25          # quarter Kelly
+  max_position_frac: 0.02       # hard cap: 2% of bankroll per position
+  fee_coefficient: 0.07         # Kalshi general fee coef — RE-CONFIRM vs live schedule
+  ci_margin: 0.0                # extra margin beyond the model CI for the gate
+  min_ev_per_contract: 0.0      # min fee/slippage-adjusted EV per contract to flag ($)
+  slippage_buffer_cents: 1.0    # conservative buffer used when order-book depth is unknown
+  require_book_for_flag: true   # refuse to flag without real order-book depth (needs auth)
+
 # Categories to SCAN. `validated` records whether the research repo's Phase 6
 # market-efficiency test found a genuine, statistically validated edge in this
 # category. Only validated categories may ever be FLAGGED (Phase 3+).

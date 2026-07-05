@@ -37,6 +37,8 @@ class Signal:
     event_time: datetime | None
     market_yes_bid: int | None
     market_yes_ask: int | None
+    market_no_bid: int | None
+    market_no_ask: int | None
     market_implied_prob: float | None
     model_prob: float | None = None
     ci_lo: float | None = None
@@ -61,6 +63,8 @@ class Signal:
             "event_time": snapshot.close_time,
             "market_yes_bid": snapshot.yes_bid,
             "market_yes_ask": snapshot.yes_ask,
+            "market_no_bid": snapshot.no_bid,
+            "market_no_ask": snapshot.no_ask,
             "market_implied_prob": market_implied_prob(snapshot),
         }
 
