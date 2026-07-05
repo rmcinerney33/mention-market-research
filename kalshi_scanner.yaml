@@ -1,0 +1,51 @@
+# Kalshi Opportunity Scanner — configuration
+#
+# READ-ONLY scanner. This system NEVER places orders (see README). It scans
+# live markets, snapshots them, and — in later phases — flags opportunities for
+# a human to review and execute manually.
+#
+# Secrets are NOT stored here. The Kalshi client reads them from the
+# environment (all optional; unset => public/unauthenticated reads only):
+#   KALSHI_API_KEY_ID          key identifier
+#   KALSHI_PRIVATE_KEY_PATH    path to the RSA private-key PEM  (or ...)
+#   KALSHI_PRIVATE_KEY_PEM     the PEM contents inline
+#   KALSHI_API_BASE            override api.base_url
+
+enabled: true          # master on/off for scanning
+kill_switch: false     # Phase 7 hook: when true, ALL flagging is paused
+
+poll_interval_s: 300   # 5 minutes — start conservative, respect rate limits
+market_status: open    # which Kalshi market status to pull
+
+db_path: data/kalshi/snapshots.sqlite   # relative to repo root
+
+api:
+  base_url: https://api.elections.kalshi.com/trade-api/v2
+  timeout_s: 10
+
+rate_limit:
+  max_requests_per_sec: 5.0   # conservative; the free tier is stricter than paid
+  burst: 5
+  max_retries: 5
+  backoff_base_s: 1.0
+  backoff_max_s: 60.0
+
+# Categories to SCAN. `validated` records whether the research repo's Phase 6
+# market-efficiency test found a genuine, statistically validated edge in this
+# category. Only validated categories may ever be FLAGGED (Phase 3+).
+#
+# RIGHT NOW NO CATEGORY IS VALIDATED. The research has only run on synthetic
+# data, where the market subsumed the model. The `mention` entry below is an
+# UNVALIDATED placeholder so the pipeline can be exercised end-to-end during
+# development — it must NOT be treated as a real edge.
+categories:
+  - name: mention
+    validated: false          # <-- UNVALIDATED placeholder. Never flag for real.
+    title_patterns:
+      - '\bsay\b'
+      - '\bsays\b'
+      - '\bsaid\b'
+      - '\bmention'
+      - '\butter'
+    series_tickers: []
+    kalshi_categories: []

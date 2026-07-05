@@ -37,3 +37,6 @@ jupyterlab>=4.3
 
 # LLM model (optional live path; offline heuristic fallback needs nothing)
 anthropic>=0.40
+
+# Kalshi scanner (Phase 1+): read-only market scanner in src/kalshi_scanner
+cryptography>=42    # RSA-PSS request signing — only exercised when API creds are set
