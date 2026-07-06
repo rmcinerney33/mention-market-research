@@ -16,10 +16,11 @@ SCAN_TS = datetime(2024, 11, 1, tzinfo=UTC)
 
 
 def _sig(model_prob=None, ci_lo=None, ci_hi=None, yes_ask=None, no_ask=None,
-         validated=True, ticker="T", reason=None):
+         validated=True, ticker="T", event_ticker="EVT", reason=None):
     scored = model_prob is not None
     return Signal(
-        scan_id=1, ticker=ticker, scan_ts=SCAN_TS, category="mention", validated=validated,
+        scan_id=1, ticker=ticker, event_ticker=event_ticker, scan_ts=SCAN_TS,
+        category="mention", validated=validated,
         event_time=None, market_yes_bid=None, market_yes_ask=yes_ask,
         market_no_bid=None, market_no_ask=no_ask, market_implied_prob=None,
         model_prob=model_prob, ci_lo=ci_lo, ci_hi=ci_hi,

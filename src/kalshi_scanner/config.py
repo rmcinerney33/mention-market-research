@@ -68,6 +68,10 @@ class TradingConfig:
     min_ev_per_contract: float = 0.0      # minimum fee/slippage-adjusted EV to flag (dollars)
     slippage_buffer_cents: float = 1.0    # conservative buffer when depth is unknown
     require_book_for_flag: bool = True    # refuse to flag without real order-book depth
+    # Portfolio exposure caps (Phase 4), as fractions of bankroll:
+    max_event_frac: float = 0.05          # any single event (e.g. one speech)
+    max_category_frac: float = 0.10       # any single category
+    max_total_frac: float = 0.25          # overall
 
 
 @dataclass(frozen=True)
@@ -177,6 +181,9 @@ def load_scanner_config(
         min_ev_per_contract=float(tr_cfg.get("min_ev_per_contract", 0.0)),
         slippage_buffer_cents=float(tr_cfg.get("slippage_buffer_cents", 1.0)),
         require_book_for_flag=bool(tr_cfg.get("require_book_for_flag", True)),
+        max_event_frac=float(tr_cfg.get("max_event_frac", 0.05)),
+        max_category_frac=float(tr_cfg.get("max_category_frac", 0.10)),
+        max_total_frac=float(tr_cfg.get("max_total_frac", 0.25)),
     )
 
     categories = [

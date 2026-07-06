@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS signals (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     scan_id             INTEGER,
     ticker              TEXT NOT NULL,
+    event_ticker        TEXT,
     scan_ts             TEXT,
     category            TEXT,
     validated           INTEGER,
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS edges (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     scan_id          INTEGER,
     ticker           TEXT NOT NULL,
+    event_ticker     TEXT,
     category         TEXT,
     validated        INTEGER,
     side             TEXT,
@@ -234,14 +236,14 @@ class SnapshotStore:
     def record_signals(self, signals: list) -> None:
         self._conn.executemany(
             """INSERT INTO signals (
-                scan_id, ticker, scan_ts, category, validated, event_time,
+                scan_id, ticker, event_ticker, scan_ts, category, validated, event_time,
                 market_yes_bid, market_yes_ask, market_no_bid, market_no_ask, market_implied_prob,
                 model_prob, ci_lo, ci_hi, model_version, model_hash, features_json, reason
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             [
                 (
-                    s.scan_id, s.ticker, _iso(s.scan_ts), s.category, int(s.validated),
-                    _iso(s.event_time), s.market_yes_bid, s.market_yes_ask,
+                    s.scan_id, s.ticker, s.event_ticker, _iso(s.scan_ts), s.category,
+                    int(s.validated), _iso(s.event_time), s.market_yes_bid, s.market_yes_ask,
                     s.market_no_bid, s.market_no_ask, s.market_implied_prob,
                     s.model_prob, s.ci_lo, s.ci_hi, s.model_version, s.model_hash,
                     s.features_json, s.reason,
@@ -268,15 +270,15 @@ class SnapshotStore:
     def record_edges(self, edges: list) -> None:
         self._conn.executemany(
             """INSERT INTO edges (
-                scan_id, ticker, category, validated, side, model_prob, ci_lo, ci_hi,
+                scan_id, ticker, event_ticker, category, validated, side, model_prob, ci_lo, ci_hi,
                 market_price, raw_edge, fee_per_contract, effective_cost, ev_per_contract,
                 kelly_fraction, contracts, notional, slippage, book_available,
                 gate_pass, flaggable, reason
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             [
                 (
-                    e.scan_id, e.ticker, e.category, int(e.validated), e.side, e.model_prob,
-                    e.ci_lo, e.ci_hi, e.market_price, e.raw_edge, e.fee_per_contract,
+                    e.scan_id, e.ticker, e.event_ticker, e.category, int(e.validated), e.side,
+                    e.model_prob, e.ci_lo, e.ci_hi, e.market_price, e.raw_edge, e.fee_per_contract,
                     e.effective_cost, e.ev_per_contract, e.kelly_fraction, e.contracts,
                     e.notional, e.slippage, int(e.book_available), int(e.gate_pass),
                     int(e.flaggable), e.reason,

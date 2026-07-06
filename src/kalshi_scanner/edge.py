@@ -34,6 +34,7 @@ from .slippage import BookLevel, fallback_fill, walk_book
 class EdgeResult:
     scan_id: int | None
     ticker: str
+    event_ticker: str | None
     category: str
     validated: bool
     side: str | None            # "YES" | "NO" | None
@@ -77,7 +78,8 @@ class EdgeEvaluator:
     def evaluate(self, signal) -> EdgeResult:
         c = self.config
         base = dict(
-            scan_id=signal.scan_id, ticker=signal.ticker, category=signal.category,
+            scan_id=signal.scan_id, ticker=signal.ticker, event_ticker=signal.event_ticker,
+            category=signal.category,
             validated=signal.validated, model_prob=signal.model_prob,
             ci_lo=signal.ci_lo, ci_hi=signal.ci_hi, fee_per_contract=0.0,
             kelly_fraction=0.0, contracts=0, notional=0.0, slippage=0.0,
@@ -133,8 +135,8 @@ class EdgeEvaluator:
         flaggable, reason = self._decide(signal.validated, ev, book_available, contracts)
 
         return EdgeResult(
-            **{k: base[k] for k in ("scan_id", "ticker", "category", "validated",
-                                    "model_prob", "ci_lo", "ci_hi")},
+            **{k: base[k] for k in ("scan_id", "ticker", "event_ticker", "category",
+                                    "validated", "model_prob", "ci_lo", "ci_hi")},
             side=side, market_price=price, raw_edge=raw_edge,
             fee_per_contract=fee_rate, effective_cost=effective_cost, ev_per_contract=ev,
             kelly_fraction=size.position_fraction, contracts=contracts, notional=notional,

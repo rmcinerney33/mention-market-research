@@ -41,6 +41,10 @@ trading:
   min_ev_per_contract: 0.0      # min fee/slippage-adjusted EV per contract to flag ($)
   slippage_buffer_cents: 1.0    # conservative buffer used when order-book depth is unknown
   require_book_for_flag: true   # refuse to flag without real order-book depth (needs auth)
+  # Portfolio exposure caps (Phase 4), fractions of bankroll:
+  max_event_frac: 0.05          # any single event (correlated markets share this budget)
+  max_category_frac: 0.10       # any single category
+  max_total_frac: 0.25          # overall
 
 # Categories to SCAN. `validated` records whether the research repo's Phase 6
 # market-efficiency test found a genuine, statistically validated edge in this

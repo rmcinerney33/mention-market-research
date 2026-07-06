@@ -238,10 +238,21 @@ needs credentials — which is the correct, conservative outcome. The full
 computation (side, EV, size) is still recorded for every market so candidates
 can be paper-traded (Phase 6).
 
+### Phase 4 (implemented): correlation & portfolio checks
+
+Per-market Kelly treats every flag as independent — but several mention markets
+on the *same speech* are highly correlated (if the speaker is on message, many
+fire together), so sizing them independently over-bets the shared risk. Markets
+are grouped by their Kalshi `event_ticker` (the correlation key) and a group
+shares one risk budget. A hierarchy of exposure caps — per event (5%), per
+category (10%), overall (25%), all as fractions of bankroll — is then enforced,
+scaling positions down proportionally where a cap binds and subtracting exposure
+already committed by open positions. We size correlated binary markets
+pragmatically (no reliable covariance for thin markets) rather than pretending
+to a precise multi-asset Kelly.
+
 ### Roadmap (checked in before each phase)
 
-4. Correlation & portfolio checks — group correlated markets (e.g. multiple
-   phrases on one speech), size Kelly at the group level, enforce exposure caps.
 5. Alerting & dashboard — local dashboard + optional push; every flag logged
    with full inputs for reproducibility.
 6. Paper-trading engine — simulate fills at snapshot prices, track to

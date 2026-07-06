@@ -31,6 +31,7 @@ def market_implied_prob(snapshot) -> float | None:
 class Signal:
     scan_id: int | None
     ticker: str
+    event_ticker: str | None
     scan_ts: datetime
     category: str
     validated: bool
@@ -57,6 +58,7 @@ class Signal:
         return {
             "scan_id": scan_id,
             "ticker": snapshot.ticker,
+            "event_ticker": snapshot.event_ticker,
             "scan_ts": snapshot.scan_ts,
             "category": category,
             "validated": validated,
