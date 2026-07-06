@@ -140,6 +140,23 @@ CREATE TABLE IF NOT EXISTS flags (
 );
 
 CREATE INDEX IF NOT EXISTS idx_flag_scan ON flags(scan_id);
+
+CREATE TABLE IF NOT EXISTS paper_positions (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker             TEXT NOT NULL,
+    event_ticker       TEXT,
+    side               TEXT,
+    contracts          INTEGER,
+    entry_cost         REAL,
+    market_entry_price REAL,
+    model_prob         REAL,
+    expected_ev        REAL,
+    flag_time          TEXT,
+    scan_id            INTEGER,
+    outcome            INTEGER,
+    settled_at         TEXT,
+    exit_market_price  REAL
+);
 """
 
 
@@ -358,6 +375,49 @@ class SnapshotStore:
                 "SELECT * FROM flags WHERE scan_id=? ORDER BY ticker", (scan_id,)
             ).fetchall()
         )
+
+    # -- paper positions -------------------------------------------------
+    def record_positions(self, positions: list) -> None:
+        self._conn.executemany(
+            """INSERT INTO paper_positions (
+                ticker, event_ticker, side, contracts, entry_cost, market_entry_price,
+                model_prob, expected_ev, flag_time, scan_id, outcome, settled_at, exit_market_price
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            [
+                (
+                    p.ticker, p.event_ticker, p.side, p.contracts, p.entry_cost,
+                    p.market_entry_price, p.model_prob, p.expected_ev, _iso(p.flag_time),
+                    p.scan_id, p.outcome, _iso(p.settled_at), p.exit_market_price,
+                )
+                for p in positions
+            ],
+        )
+        self._conn.commit()
+
+    def load_positions(self) -> list:
+        from .paper_trading import PaperPosition
+
+        out = []
+        for r in self._conn.execute("SELECT * FROM paper_positions ORDER BY id").fetchall():
+            out.append(
+                PaperPosition(
+                    ticker=r["ticker"], event_ticker=r["event_ticker"], side=r["side"],
+                    contracts=r["contracts"], entry_cost=r["entry_cost"],
+                    market_entry_price=r["market_entry_price"], model_prob=r["model_prob"],
+                    expected_ev=r["expected_ev"],
+                    flag_time=datetime.fromisoformat(r["flag_time"]) if r["flag_time"] else None,
+                    scan_id=r["scan_id"], outcome=r["outcome"],
+                    settled_at=datetime.fromisoformat(r["settled_at"]) if r["settled_at"] else None,
+                    exit_market_price=r["exit_market_price"],
+                )
+            )
+        return out
+
+    def count_positions(self, settled_only: bool = False) -> int:
+        sql = "SELECT COUNT(*) FROM paper_positions"
+        if settled_only:
+            sql += " WHERE outcome IS NOT NULL"
+        return int(self._conn.execute(sql).fetchone()[0])
 
     def find_gaps(self, expected_interval_s: float, slack: float = 1.5) -> list[dict]:
         """Report coverage gaps: failed runs, and stretches between successful

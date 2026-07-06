@@ -264,10 +264,22 @@ notifications go to an ntfy.sh topic for flags whose expected value clears a
 threshold — **disabled by default**, with an injectable transport so it never
 touches the network in tests.
 
+### Phase 6 (implemented): paper-trading engine
+
+The required gate before any real money. Each flag opens a simulated position at
+the price actually available at flag time (with the slippage model's effective
+cost); when the market resolves, it settles against the real outcome. The report
+(`python -m kalshi_scanner paper-report`) computes simulated P&L, hit rate, the
+realized **Brier** of flagged predictions, realized edge vs. the model's expected
+edge (with a one-sample **t-test** on the per-flag differential — not eyeballing),
+max drawdown, and whether the market drifted toward or away from the model
+between flag and resolution. The **go/no-go** verdict is deliberately hard to
+earn: it requires ≥ 8 weeks and ≥ 50 settled flags, positive realized edge, and
+realized performance not significantly below expectation. Anything short prints
+`NO-GO` with the specific reason.
+
 ### Roadmap (checked in before each phase)
 
-6. Paper-trading engine — simulate fills at snapshot prices, track to
-   resolution, produce a go/no-go report (realized vs. expected edge).
 7. Monitoring & model health — calibration-drift alerts, data-quality checks,
    and an instant kill-switch.
 

@@ -29,7 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="kalshi_scanner", description=__doc__)
     ap.add_argument(
         "command",
-        choices=["scan-once", "run", "status", "generate-signals", "evaluate-edges", "flags"],
+        choices=["scan-once", "run", "status", "generate-signals", "evaluate-edges",
+                 "flags", "paper-report"],
     )
     ap.add_argument("--config", default=None, help="path to kalshi_scanner.yaml")
     ap.add_argument("--max-iterations", type=int, default=None,
@@ -146,6 +147,27 @@ def main(argv: list[str] | None = None) -> int:
             sent = Alerter(config.alerts).notify_flags(flags)
             print(f"{len(flags)} flag(s) logged, {len(sent)} alert(s) sent")
             print(f"dashboard -> {dash}")
+        return 0
+
+    if args.command == "paper-report":
+        from .paper_trading import build_report
+        with SnapshotStore(config.db_path) as store:
+            positions = store.load_positions()
+            r = build_report(positions)
+            print(f"paper positions: {r.n_positions} ({r.n_settled} settled)")
+            if r.n_settled:
+                print(f"P&L:            ${r.pnl:,.2f}")
+                print(f"hit rate:       {r.hit_rate:.1%}")
+                print(f"realized Brier: {r.realized_brier:.4f}")
+                print(f"edge realized:  {r.realized_edge_mean:+.4f} vs expected "
+                      f"{r.expected_edge_mean:+.4f} (t={r.edge_diff_tstat:.2f}, "
+                      f"p={r.edge_diff_pvalue:.3f})")
+                print(f"max drawdown:   ${r.max_drawdown:,.2f}")
+                print(f"toward-model:   {r.decay_toward_model:.1%} of flags")
+                print(f"span:           {r.span_weeks:.1f} weeks")
+            print(f"GO/NO-GO:       {'GO' if r.go else 'NO-GO'}")
+            for note in r.notes:
+                print(f"  - {note}")
         return 0
 
     scanner = build_scanner(config)
