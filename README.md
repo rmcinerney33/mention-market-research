@@ -251,10 +251,21 @@ already committed by open positions. We size correlated binary markets
 pragmatically (no reliable covariance for thin markets) rather than pretending
 to a precise multi-asset Kelly.
 
+### Phase 5 (implemented): alerting & dashboard
+
+Every flag is written to an append-only `flags` table with **full inputs** —
+model version + hash, the exact features fed to the model, the price/book state
+at flag time, side, EV, and size — so any flag is reproducible and auditable
+later. A dependency-free HTML dashboard (`python -m kalshi_scanner flags` →
+`outputs/kalshi_dashboard.html`) lists every market that cleared the CI gate,
+flags first, with direction, model prob vs market price (with CI), fee-adjusted
+EV, suggested size, liquidity notes, and time-to-resolution. Optional push
+notifications go to an ntfy.sh topic for flags whose expected value clears a
+threshold — **disabled by default**, with an injectable transport so it never
+touches the network in tests.
+
 ### Roadmap (checked in before each phase)
 
-5. Alerting & dashboard — local dashboard + optional push; every flag logged
-   with full inputs for reproducibility.
 6. Paper-trading engine — simulate fills at snapshot prices, track to
    resolution, produce a go/no-go report (realized vs. expected edge).
 7. Monitoring & model health — calibration-drift alerts, data-quality checks,

@@ -75,6 +75,17 @@ class TradingConfig:
 
 
 @dataclass(frozen=True)
+class AlertConfig:
+    """Optional push notifications for new flags (Phase 5). Disabled by default."""
+
+    enabled: bool = False
+    channel: str = "ntfy"                 # "ntfy" (HTTP) supported
+    ntfy_server: str = "https://ntfy.sh"
+    ntfy_topic: str = ""
+    min_ev_notional: float = 1.0          # only alert flags with EV*size >= this ($)
+
+
+@dataclass(frozen=True)
 class KalshiApiConfig:
     base_url: str = "https://api.elections.kalshi.com/trade-api/v2"
     timeout_s: float = 10.0
@@ -97,6 +108,7 @@ class ScannerConfig:
     api: KalshiApiConfig
     rate_limit: RateLimitConfig
     trading: TradingConfig
+    alerts: AlertConfig
     categories: list[CategoryRule]
 
     @property
@@ -186,6 +198,15 @@ def load_scanner_config(
         max_total_frac=float(tr_cfg.get("max_total_frac", 0.25)),
     )
 
+    al_cfg = cfg.get("alerts", {})
+    alerts = AlertConfig(
+        enabled=bool(al_cfg.get("enabled", False)),
+        channel=str(al_cfg.get("channel", "ntfy")),
+        ntfy_server=str(al_cfg.get("ntfy_server", "https://ntfy.sh")),
+        ntfy_topic=str(al_cfg.get("ntfy_topic", "")),
+        min_ev_notional=float(al_cfg.get("min_ev_notional", 1.0)),
+    )
+
     categories = [
         CategoryRule(
             name=c["name"],
@@ -210,6 +231,7 @@ def load_scanner_config(
         api=api,
         rate_limit=rate_limit,
         trading=trading,
+        alerts=alerts,
         categories=categories,
     )
 

@@ -46,6 +46,14 @@ trading:
   max_category_frac: 0.10       # any single category
   max_total_frac: 0.25          # overall
 
+# Optional push notifications for new flags (Phase 5). Disabled by default.
+alerts:
+  enabled: false
+  channel: ntfy                 # ntfy.sh HTTP push
+  ntfy_server: https://ntfy.sh
+  ntfy_topic: ""                # set to your private topic to enable
+  min_ev_notional: 1.0          # only alert flags with EV*size >= this ($)
+
 # Categories to SCAN. `validated` records whether the research repo's Phase 6
 # market-efficiency test found a genuine, statistically validated edge in this
 # category. Only validated categories may ever be FLAGGED (Phase 3+).

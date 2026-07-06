@@ -113,6 +113,33 @@ CREATE TABLE IF NOT EXISTS edges (
 );
 
 CREATE INDEX IF NOT EXISTS idx_edge_scan ON edges(scan_id);
+
+CREATE TABLE IF NOT EXISTS flags (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    flagged_at       TEXT,
+    scan_id          INTEGER,
+    ticker           TEXT NOT NULL,
+    event_ticker     TEXT,
+    category         TEXT,
+    side             TEXT,
+    model_prob       REAL,
+    ci_lo            REAL,
+    ci_hi            REAL,
+    market_price     REAL,
+    raw_edge         REAL,
+    ev_per_contract  REAL,
+    contracts        INTEGER,
+    notional         REAL,
+    slippage         REAL,
+    book_available   INTEGER,
+    model_version    TEXT,
+    model_hash       TEXT,
+    features_json    TEXT,
+    event_time       TEXT,
+    reason           TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_flag_scan ON flags(scan_id);
 """
 
 
@@ -298,6 +325,37 @@ class SnapshotStore:
         return list(
             self._conn.execute(
                 "SELECT * FROM edges WHERE scan_id=? ORDER BY flaggable DESC, ticker", (scan_id,)
+            ).fetchall()
+        )
+
+    # -- flags (permanent, append-only audit log) ------------------------
+    def record_flags(self, flags: list) -> None:
+        self._conn.executemany(
+            """INSERT INTO flags (
+                flagged_at, scan_id, ticker, event_ticker, category, side, model_prob,
+                ci_lo, ci_hi, market_price, raw_edge, ev_per_contract, contracts, notional,
+                slippage, book_available, model_version, model_hash, features_json,
+                event_time, reason
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            [
+                (
+                    _iso(f.flagged_at), f.scan_id, f.ticker, f.event_ticker, f.category, f.side,
+                    f.model_prob, f.ci_lo, f.ci_hi, f.market_price, f.raw_edge, f.ev_per_contract,
+                    f.contracts, f.notional, f.slippage, int(f.book_available), f.model_version,
+                    f.model_hash, f.features_json, _iso(f.event_time), f.reason,
+                )
+                for f in flags
+            ],
+        )
+        self._conn.commit()
+
+    def count_flags(self) -> int:
+        return int(self._conn.execute("SELECT COUNT(*) FROM flags").fetchone()[0])
+
+    def flags_for_scan(self, scan_id: int) -> list[sqlite3.Row]:
+        return list(
+            self._conn.execute(
+                "SELECT * FROM flags WHERE scan_id=? ORDER BY ticker", (scan_id,)
             ).fetchall()
         )
 

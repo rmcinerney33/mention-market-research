@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from datetime import UTC
 
 from .config import load_scanner_config
 from .scanner import build_scanner
@@ -28,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="kalshi_scanner", description=__doc__)
     ap.add_argument(
         "command",
-        choices=["scan-once", "run", "status", "generate-signals", "evaluate-edges"],
+        choices=["scan-once", "run", "status", "generate-signals", "evaluate-edges", "flags"],
     )
     ap.add_argument("--config", default=None, help="path to kalshi_scanner.yaml")
     ap.add_argument("--max-iterations", type=int, default=None,
@@ -109,6 +110,42 @@ def main(argv: list[str] | None = None) -> int:
                       f"size={e.contracts} — {'FLAG' if e.flaggable else e.reason}")
             if not gated:
                 print("  (no market's executable price is outside its model CI — all noise)")
+        return 0
+
+    if args.command == "flags":
+        from datetime import datetime
+
+        from mention_market.config import repo_root
+
+        from .alerts import Alerter
+        from .dashboard import write_dashboard
+        from .edge import EdgeEvaluator
+        from .flags import build_flags
+        from .portfolio import PortfolioAllocator
+        from .signal_generator import build_default_signal_generator
+        with SnapshotStore(config.db_path) as store:
+            scan_id = args.scan_id or store.latest_ok_scan_id()
+            if scan_id is None:
+                print("no successful scan found; run scan-once first")
+                return 1
+            snapshots = store.load_snapshots(scan_id)
+            scan_ts = snapshots[0].scan_ts if snapshots else datetime.now(UTC)
+            gen = build_default_signal_generator(
+                config, store=None, model_name=args.signal_model, n_bootstrap=args.n_bootstrap
+            )
+            signals = gen.generate(snapshots)
+            edges = EdgeEvaluator(config.trading).evaluate_all(signals, scan_id=scan_id, store=store)
+            allocations = PortfolioAllocator(config.trading).allocate(edges)
+            flags = build_flags(allocations, signals,
+                                flagged_at=datetime.now(UTC), scan_id=scan_id)
+            store.record_flags(flags)
+            dash = write_dashboard(
+                repo_root() / "outputs" / "kalshi_dashboard.html", edges, signals,
+                scan_ts=scan_ts, validated_categories=config.validated_categories,
+            )
+            sent = Alerter(config.alerts).notify_flags(flags)
+            print(f"{len(flags)} flag(s) logged, {len(sent)} alert(s) sent")
+            print(f"dashboard -> {dash}")
         return 0
 
     scanner = build_scanner(config)
