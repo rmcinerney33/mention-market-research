@@ -278,10 +278,26 @@ earn: it requires ≥ 8 weeks and ≥ 50 settled flags, positive realized edge, 
 realized performance not significantly below expectation. Anything short prints
 `NO-GO` with the specific reason.
 
-### Roadmap (checked in before each phase)
+### Phase 7 (implemented): monitoring & model health
 
-7. Monitoring & model health — calibration-drift alerts, data-quality checks,
-   and an instant kill-switch.
+The last line of defense against a decayed edge. `python -m kalshi_scanner
+monitor` runs two checks and an instant off-switch:
+
+- **Calibration drift** — rolling Brier and log-loss on the last N *resolved*
+  flags vs. the deployed model's validation-period baseline; flags `DEGRADED`
+  when materially worse (default >15%). Markets adapt, so yesterday's edge is
+  watched, not assumed.
+- **Data quality** — stale scan, coverage gaps, Kalshi **schema drift** (markets
+  missing expected fields), and stale transcripts/GDELT feeding the model, so
+  the system complains loudly instead of producing garbage features silently.
+- **Kill-switch** — a config flag that forces every market to non-flaggable
+  (`reason=kill_switch`) instantly, wired through the edge evaluator so *all*
+  flag paths honor it.
+
+**All seven phases are now implemented, each as its own tested commit.** Nothing
+is flaggable yet — no category is validated and order-book depth needs
+credentials — which is the correct, conservative state until real data and a
+successful paper-trading period say otherwise.
 
 ### Honest failure modes
 

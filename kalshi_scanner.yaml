@@ -54,6 +54,16 @@ alerts:
   ntfy_topic: ""                # set to your private topic to enable
   min_ev_notional: 1.0          # only alert flags with EV*size >= this ($)
 
+# Model-health & data-quality monitoring (Phase 7).
+monitoring:
+  baseline_brier: 0.24          # set from the DEPLOYED model's validation-period Brier
+  baseline_logloss: 0.68
+  drift_window: 30              # rolling window of recent settled flags
+  drift_rel_tolerance: 0.15     # >15% worse than baseline => degraded
+  min_drift_sample: 20          # need this many resolved flags to judge drift
+  max_scan_age_s: 900           # latest ok scan older than this => stale
+  max_corpus_age_days: 7        # transcripts/GDELT older than this => stale features
+
 # Categories to SCAN. `validated` records whether the research repo's Phase 6
 # market-efficiency test found a genuine, statistically validated edge in this
 # category. Only validated categories may ever be FLAGGED (Phase 3+).

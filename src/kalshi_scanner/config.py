@@ -86,6 +86,24 @@ class AlertConfig:
 
 
 @dataclass(frozen=True)
+class MonitoringConfig:
+    """Model-health and data-quality thresholds (Phase 7)."""
+
+    # Calibration drift vs the deployed model's validation-period performance.
+    baseline_brier: float = 0.24          # set from the model's validation Brier
+    baseline_logloss: float = 0.68
+    drift_window: int = 30                 # rolling window of recent settled flags
+    drift_rel_tolerance: float = 0.15      # >15% worse than baseline => degraded
+    min_drift_sample: int = 20             # need this many resolved flags to judge
+    # Data quality.
+    max_scan_age_s: float = 900.0          # latest ok scan older than this => stale
+    max_corpus_age_days: float = 7.0       # transcripts/GDELT older than this => stale
+    required_market_fields: tuple[str, ...] = (
+        "ticker", "title", "close_time", "yes_ask", "no_ask",
+    )
+
+
+@dataclass(frozen=True)
 class KalshiApiConfig:
     base_url: str = "https://api.elections.kalshi.com/trade-api/v2"
     timeout_s: float = 10.0
@@ -109,6 +127,7 @@ class ScannerConfig:
     rate_limit: RateLimitConfig
     trading: TradingConfig
     alerts: AlertConfig
+    monitoring: MonitoringConfig
     categories: list[CategoryRule]
 
     @property
@@ -207,6 +226,19 @@ def load_scanner_config(
         min_ev_notional=float(al_cfg.get("min_ev_notional", 1.0)),
     )
 
+    mon_cfg = cfg.get("monitoring", {})
+    default_fields = list(MonitoringConfig.required_market_fields)
+    monitoring = MonitoringConfig(
+        baseline_brier=float(mon_cfg.get("baseline_brier", 0.24)),
+        baseline_logloss=float(mon_cfg.get("baseline_logloss", 0.68)),
+        drift_window=int(mon_cfg.get("drift_window", 30)),
+        drift_rel_tolerance=float(mon_cfg.get("drift_rel_tolerance", 0.15)),
+        min_drift_sample=int(mon_cfg.get("min_drift_sample", 20)),
+        max_scan_age_s=float(mon_cfg.get("max_scan_age_s", 900.0)),
+        max_corpus_age_days=float(mon_cfg.get("max_corpus_age_days", 7.0)),
+        required_market_fields=tuple(mon_cfg.get("required_market_fields", default_fields)),
+    )
+
     categories = [
         CategoryRule(
             name=c["name"],
@@ -232,6 +264,7 @@ def load_scanner_config(
         rate_limit=rate_limit,
         trading=trading,
         alerts=alerts,
+        monitoring=monitoring,
         categories=categories,
     )
 

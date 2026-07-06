@@ -89,6 +89,15 @@ def test_ev_below_min_blocks_flag():
     assert r.flaggable is False
 
 
+def test_kill_switch_forces_not_flaggable():
+    # A would-be flaggable market becomes non-flaggable instantly under the switch.
+    ev = EdgeEvaluator(_cfg(), kill_switch=True)
+    r = ev.evaluate(_sig(model_prob=0.8, ci_lo=0.6, ci_hi=0.95, yes_ask=40, no_ask=62))
+    assert r.gate_pass is True          # economics still computed
+    assert r.flaggable is False
+    assert r.reason == "kill_switch"
+
+
 def test_unscored_signal_passes_through_reason():
     ev = EdgeEvaluator(_cfg())
     r = ev.evaluate(_sig(reason="no_features"))

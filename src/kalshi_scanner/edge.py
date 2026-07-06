@@ -62,12 +62,17 @@ class EdgeEvaluator:
         config: TradingConfig,
         *,
         books: dict[str, tuple[list[BookLevel], list[BookLevel]]] | None = None,
+        kill_switch: bool = False,
     ) -> None:
         """``books`` maps ticker -> (yes_ask_levels, no_ask_levels) when real
         order-book depth is available (requires Kalshi auth). Absent it, a
-        conservative top-of-book-plus-buffer fill is used."""
+        conservative top-of-book-plus-buffer fill is used.
+
+        ``kill_switch`` (Phase 7) forces every market to be non-flaggable — an
+        instant pause on flagging with no other change to the computation."""
         self.config = config
         self.books = books or {}
+        self.kill_switch = kill_switch
 
     def evaluate_all(self, signals, scan_id: int | None = None, store=None) -> list[EdgeResult]:
         results = [self.evaluate(s) for s in signals]
@@ -164,6 +169,8 @@ class EdgeEvaluator:
 
     def _decide(self, validated, ev, book_available, contracts):
         c = self.config
+        if self.kill_switch:
+            return False, "kill_switch"
         if ev <= c.min_ev_per_contract:
             return False, "ev_below_min"
         if c.require_book_for_flag and not book_available:

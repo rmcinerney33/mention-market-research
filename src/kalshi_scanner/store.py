@@ -276,6 +276,11 @@ class SnapshotStore:
         ).fetchone()
         return int(row[0]) if row else None
 
+    def latest_ok_run(self) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM scan_runs WHERE status='ok' ORDER BY scan_id DESC LIMIT 1"
+        ).fetchone()
+
     # -- signals ---------------------------------------------------------
     def record_signals(self, signals: list) -> None:
         self._conn.executemany(
