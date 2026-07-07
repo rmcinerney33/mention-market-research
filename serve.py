@@ -51,6 +51,13 @@ if not index_path.exists():
     <p>All 7 phases implemented, end-to-end validated pipeline with synthetic ground truth.</p>
 
     <div class="section">
+        <h2>📈 Kalshi Opportunity Scanner (dashboard)</h2>
+        <p><a href="kalshi_dashboard.html">→ Open the live scanner dashboard</a></p>
+        <p style="color:#666; font-size:14px;">Read-only. Never places orders. Currently 0 flaggable
+        by design (no category validated, no order-book depth).</p>
+    </div>
+
+    <div class="section">
         <h2>📋 Main Report</h2>
         <p><a href="reports/REPORT.md">→ Read the full report (Markdown)</a></p>
     </div>
