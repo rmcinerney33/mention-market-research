@@ -17,6 +17,12 @@ kill_switch: false     # Phase 7 hook: when true, ALL flagging is paused
 poll_interval_s: 300   # 5 minutes — start conservative, respect rate limits
 market_status: open    # which Kalshi market status to pull
 
+# --- scan scope & safety --------------------------------------------------
+# Kalshi has >1M open markets. Prefer TARGETED scans: give a category
+# `series_tickers` and only those series are queried server-side (fast).
+max_markets_per_scan: 20000   # HARD CAP: a scan never examines more than this (0 = unlimited)
+allow_full_scan: false        # if true, title-only categories crawl ALL markets (still capped)
+
 db_path: data/kalshi/snapshots.sqlite   # relative to repo root
 
 api:

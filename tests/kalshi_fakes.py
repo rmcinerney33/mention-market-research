@@ -73,7 +73,9 @@ class StubClient:
         self.calls: list[dict] = []
 
     def iter_markets(self, *, status="open", series_ticker=None, page_limit=1000, max_pages=None):
-        self.calls.append({"status": status, "series_ticker": series_ticker})
+        self.calls.append(
+            {"status": status, "series_ticker": series_ticker, "max_pages": max_pages}
+        )
         if self._error is not None:
             raise self._error
         yield from self._markets

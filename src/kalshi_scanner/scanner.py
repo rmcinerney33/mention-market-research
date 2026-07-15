@@ -13,6 +13,7 @@ never interpolate over a gap.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Callable, Iterator
 
@@ -44,18 +45,73 @@ class Scanner:
         self.matcher = matcher or CategoryMatcher(config.categories)
 
     def _iter_relevant_markets(self) -> Iterator[dict]:
+        """Yield candidate markets, preferring cheap server-side queries and
+        never exceeding the ``max_markets_per_scan`` hard cap.
+
+        Kalshi's ``/markets`` endpoint can filter by series server-side but not
+        by title, so:
+        - categories with ``series_tickers`` are fetched with one targeted query
+          each (cheap — a series is small);
+        - categories that match only on title need a full-market crawl (Kalshi
+          has >1M open markets), which is gated behind ``allow_full_scan`` and,
+          when enabled, still bounded by the cap.
+        """
+        cap = self.config.max_markets_per_scan
+        page_limit = 1000
+        max_pages = math.ceil(cap / page_limit) if cap and cap > 0 else None
+
         cats = self.config.categories
-        # Only narrow the query to specific series if *every* category is
-        # series-scoped; otherwise a title/category-matched market would be
-        # missed. The mention placeholder is title-based, so we scan all.
-        if cats and all(c.series_tickers for c in cats):
-            series = sorted({s for c in cats for s in c.series_tickers})
-            for st in series:
-                yield from self.client.iter_markets(
-                    status=self.config.market_status, series_ticker=st
+        series = sorted({s for c in cats for s in c.series_tickers})
+        title_only = [c for c in cats if not c.series_tickers]
+
+        seen: set[str] = set()
+        count = 0
+
+        def _fresh(market: dict) -> bool:
+            nonlocal count
+            tk = market.get("ticker")
+            if tk in seen:
+                return False
+            if tk:
+                seen.add(tk)
+            count += 1
+            return True
+
+        # 1) Targeted, server-side: one query per configured series.
+        for st in series:
+            for m in self.client.iter_markets(
+                status=self.config.market_status, series_ticker=st, max_pages=max_pages
+            ):
+                if _fresh(m):
+                    yield m
+                if cap and count >= cap:
+                    logger.warning("scan hit max_markets_per_scan=%d cap (series stage)", cap)
+                    return
+
+        # 2) Title-only categories: no server-side title filter exists.
+        if title_only:
+            names = [c.name for c in title_only]
+            if not self.config.allow_full_scan:
+                logger.warning(
+                    "skipping title-only categor%s %s: matching them requires crawling "
+                    "ALL open markets (allow_full_scan=false). Add series_tickers to scope "
+                    "the query, or set allow_full_scan=true (bounded by "
+                    "max_markets_per_scan=%d).",
+                    "y" if len(names) == 1 else "ies", names, cap,
                 )
-        else:
-            yield from self.client.iter_markets(status=self.config.market_status)
+                return
+            logger.warning(
+                "allow_full_scan=true: crawling open markets for %s (hard cap %d markets). "
+                "This is the expensive path — prefer series_tickers when possible.", names, cap,
+            )
+            for m in self.client.iter_markets(
+                status=self.config.market_status, max_pages=max_pages
+            ):
+                if _fresh(m):
+                    yield m
+                if cap and count >= cap:
+                    logger.warning("scan hit max_markets_per_scan=%d cap (full-scan stage)", cap)
+                    return
 
     def scan_once(self) -> ScanResult:
         scan_ts = self._clock()

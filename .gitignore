@@ -50,7 +50,9 @@ kalshi_scanner.local.yaml
 Thumbs.db
 
 # Editors
-.vscode/
+# Share the src-layout PYTHONPATH + pytest config, ignore other .vscode files.
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 

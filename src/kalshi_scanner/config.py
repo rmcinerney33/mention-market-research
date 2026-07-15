@@ -122,6 +122,8 @@ class ScannerConfig:
     kill_switch: bool
     poll_interval_s: int
     market_status: str
+    max_markets_per_scan: int   # hard cap: never examine more than this per scan (0 = unlimited)
+    allow_full_scan: bool       # permit crawling ALL open markets for title-only categories
     db_path: Path
     api: KalshiApiConfig
     rate_limit: RateLimitConfig
@@ -259,6 +261,8 @@ def load_scanner_config(
         kill_switch=bool(cfg.get("kill_switch", False)),
         poll_interval_s=int(cfg.get("poll_interval_s", 300)),
         market_status=str(cfg.get("market_status", "open")),
+        max_markets_per_scan=int(cfg.get("max_markets_per_scan", 20000)),
+        allow_full_scan=bool(cfg.get("allow_full_scan", False)),
         db_path=db_path,
         api=api,
         rate_limit=rate_limit,

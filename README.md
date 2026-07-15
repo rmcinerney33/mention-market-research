@@ -167,8 +167,22 @@ records a snapshot of every market (ticker, title, yes/no bid+ask, last price,
 volume, open interest, time-to-resolution) into SQLite with scan timestamps, and
 handles downtime by **logging gaps rather than interpolating** over them.
 
+**Setup**
+
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.lock.txt      # pinned deps
 pip install -e .                          # registers both packages
+```
+
+**Running.** The code uses a `src/` layout. Opening the folder in **VS Code**
+(with the Python extension, interpreter set to `.venv`) makes the commands work
+with no prefix — `.vscode/settings.json` puts `src/` on the path for you. In a
+plain terminal, `source .venv/bin/activate` does the same. (If you ever see
+`No module named kalshi_scanner`, run with `PYTHONPATH=src python -m ...` — the
+setuptools editable link is unreliable on some Python builds.)
+
+```bash
 python -m kalshi_scanner scan-once        # one scan
 python -m kalshi_scanner run              # poll forever (default every 5 min)
 python -m kalshi_scanner status           # DB stats + coverage gaps
@@ -179,6 +193,16 @@ Secrets are read from the environment, never the file: `KALSHI_API_KEY_ID`,
 `KALSHI_PRIVATE_KEY_PATH` (or `KALSHI_PRIVATE_KEY_PEM`), `KALSHI_API_BASE`.
 Unauthenticated reads work for basic market fields; **order-book depth requires
 credentials** and is used in later phases.
+
+**Scan scope & safety.** Kalshi lists **>1M** open markets, so scans are
+deliberately bounded:
+
+- Give a category `series_tickers` and only those series are queried
+  **server-side** — fast and targeted (the preferred path).
+- A category that matches only on *title* (like the `mention` placeholder)
+  can't be filtered server-side; crawling all markets is gated behind
+  `allow_full_scan: true` and, either way, **hard-capped at
+  `max_markets_per_scan`** (default 20,000) so a scan can never run away.
 
 ### Phase 2 (implemented): signal generator
 
